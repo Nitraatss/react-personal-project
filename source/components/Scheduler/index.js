@@ -4,6 +4,7 @@ import moment from "moment";
 
 // Components
 import Task from "components/Task";
+import Spinner from "components/Spinner";
 
 // Instruments
 import { getUniqueID } from "instruments/";
@@ -17,6 +18,7 @@ const MAXIMUM_TASK_LENGTH = 50;
 
 export default class Scheduler extends Component {
     state = {
+        spinnerState:  true,
         newTaskText:   "",
         previousTasks: {
             filled:    false,
@@ -60,6 +62,10 @@ export default class Scheduler extends Component {
             }
         ],
     };
+
+    componentDidMount () {
+        api.fetchTasks();
+    }
 
     _changeTaskCompleteState = (taskId) => {
         const updatedTasks = this.state.tasksList;
@@ -226,8 +232,7 @@ export default class Scheduler extends Component {
     };
 
     render () {
-        const { tasksList } = this.state;
-        const { newTaskText } = this.state;
+        const { tasksList, newTaskText, spinnerState } = this.state;
 
         let allTasksCompleted = true;
 
@@ -261,6 +266,7 @@ export default class Scheduler extends Component {
                             placeholder = 'Поиск'
                             type = 'search'
                         />
+                        <Spinner spinnerState = { spinnerState } />
                     </header>
                     <section>
                         <form
