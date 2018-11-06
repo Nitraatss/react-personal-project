@@ -18,99 +18,118 @@ const MAXIMUM_TASK_LENGTH = 50;
 
 export default class Scheduler extends Component {
     state = {
-        spinnerState:  true,
+        spinnerState:  false,
         newTaskText:   "",
         previousTasks: {
             filled:    false,
             tasksList: [],
         },
-        tasksList: [
-            {
-                id:        getUniqueID(),
-                date:      moment().unix(),
-                completed: false,
-                favorite:  false,
-                message:   "Задача1",
-            },
-            {
-                id:        getUniqueID(),
-                date:      moment().unix(),
-                completed: false,
-                favorite:  false,
-                message:   "Задача2",
-            },
-            {
-                id:        getUniqueID(),
-                date:      moment().unix(),
-                completed: true,
-                favorite:  true,
-                message:   "Задача3",
-            },
-            {
-                id:        getUniqueID(),
-                date:      moment().unix(),
-                completed: true,
-                favorite:  false,
-                message:   "Задача4",
-            },
-            {
-                id:        getUniqueID(),
-                date:      moment().unix(),
-                completed: false,
-                favorite:  true,
-                message:   "Задача5",
-            }
-        ],
+        tasksList: [],
     };
 
     componentDidMount () {
-        api.fetchTasks();
+        this._fetchTasks();
     }
 
-    _changeTaskCompleteState = (taskId) => {
-        const updatedTasks = this.state.tasksList;
+    _fetchTasks = async () => {
+        this._changeSpinnerState(true);
 
-        updatedTasks.forEach((task) => {
-            if (task.id === taskId) {
-                task.completed = !task.completed;
-            }
-        });
+        try {
+            const recivedTasks = await api.fetchTasks();
 
+            this.setState({
+                tasksList: recivedTasks,
+            });
+        } catch ({ message }) {
+            console.log(message);
+        }
+
+        this._changeSpinnerState(false);
+    };
+
+    _changeSpinnerState = (state) => {
         this.setState({
-            tasksList: updatedTasks,
+            spinnerState: state,
         });
     };
 
-    _changeTaskFavouriteState = (taskId) => {
-        const updatedTasks = this.state.tasksList;
+    _changeTaskCompleteState = async (taskId) => {
+        this._changeSpinnerState(true);
 
-        updatedTasks.forEach((task) => {
-            if (task.id === taskId) {
-                task.favorite = !task.favorite;
+        try {
+            const updatedTasks = this.state.tasksList;
+            const changedTask = [];
+
+            updatedTasks.forEach((task) => {
+                if (task.id === taskId) {
+                    task.completed = !task.completed;
+                    changedTask.push(task);
+                }
+            });
+
+            if (await api.updateTask(changedTask)) {
+                this.setState({
+                    tasksList: updatedTasks,
+                });
             }
-        });
+        } catch ({ message }) {
+            console.log(message);
+        }
 
-        this.setState({
-            tasksList: updatedTasks,
-        });
+        this._changeSpinnerState(false);
     };
 
-    _createTask = (taskText) => {
-        const updatedTasks = this.state.tasksList;
+    _changeTaskFavouriteState = async (taskId) => {
+        this._changeSpinnerState(true);
 
-        const newTask = {
-            id:        getUniqueID(),
-            created:   moment().unix(),
-            completed: false,
-            favorite:  false,
-            message:   taskText,
-        };
+        try {
+            const updatedTasks = this.state.tasksList;
+            const changedTask = [];
 
-        updatedTasks.push(newTask);
+            updatedTasks.forEach((task) => {
+                if (task.id === taskId) {
+                    task.favorite = !task.favorite;
+                    changedTask.push(task);
+                }
+            });
 
-        this.setState({
-            tasksList: updatedTasks,
-        });
+            if (await api.updateTask(changedTask)) {
+                this.setState({
+                    tasksList: updatedTasks,
+                });
+            }
+        } catch ({ message }) {
+            console.log(message);
+        }
+
+        this._changeSpinnerState(false);
+    };
+
+    _createTask = async (taskText) => {
+        this._changeSpinnerState(true);
+        try {
+            const updatedTasks = this.state.tasksList;
+
+            const newTask = {
+                id:        getUniqueID(),
+                created:   moment().unix(),
+                completed: false,
+                favorite:  false,
+                message:   taskText,
+            };
+
+            const sendedTask = await api.createTask(taskText);
+
+            updatedTasks.push(sendedTask);
+
+            this.setState({
+                tasksList: updatedTasks,
+            });
+        } catch ({ message }) {
+            console.log(message);
+        }
+
+        this._changeSpinnerState(false);
     };
 
     _updateNewTaskText = (evt) => {
@@ -143,16 +162,24 @@ export default class Scheduler extends Component {
         }
     };
 
-    _completeAllTasks = () => {
-        const updatedTasks = this.state.tasksList;
+    _completeAllTasks = async () => {
+        this._changeSpinnerState(true);
+        try {
+            const updatedTasks = this.state.tasksList;
 
-        updatedTasks.forEach((task) => {
-            task.completed = true;
-        });
+            updatedTasks.forEach((task) => {
+                task.completed = true;
+            });
 
-        this.setState({
-            tasksList: updatedTasks,
-        });
+            if (await api.updateTask(updatedTasks)) {
+                this.setState({
+                    tasksList: updatedTasks,
+                });
+            }
+        } catch ({ message }) {
+            console.log(message);
+        }
+        this._changeSpinnerState(false);
     };
 
     _searchTasks = (evt) => {
@@ -203,32 +230,55 @@ export default class Scheduler extends Component {
         evt.preventDefault();
     };
 
-    _deleteTask = (taskId) => {
-        const updatedTasks = this.state.tasksList.filter(
-            (task) => task.id !== taskId
-        );
+    _deleteTask = async (taskId) => {
+        this._changeSpinnerState(true);
+        try {
+            const taskDeleted = api.removeTask(taskId);
 
-        this.setState({
-            tasksList: updatedTasks,
-        });
+            if (taskDeleted) {
+                const updatedTasks = this.state.tasksList.filter(
+                    (task) => task.id !== taskId
+                );
+
+                this.setState({
+                    tasksList: updatedTasks,
+                });
+            }
+        } catch ({ message }) {
+            console.log(message);
+        }
+
+        this._changeSpinnerState(false);
     };
 
-    _updateTask = (taskId, newMessage) => {
-        const updatedTasks = this.state.tasksList;
+    _updateTask = async (taskId, newMessage) => {
+        this._changeSpinnerState(true);
+        try {
+            const updatedTasks = this.state.tasksList;
 
-        if (newMessage.split(" ").join("").length) {
-            updatedTasks.forEach((task) => {
-                if (task.id === taskId) {
-                    task.message = newMessage;
+            if (newMessage.split(" ").join("").length) {
+                const changedTask = [];
+
+                updatedTasks.forEach((task) => {
+                    if (task.id === taskId) {
+                        task.message = newMessage;
+                        changedTask.push(task);
+                    }
+                });
+
+                if (await api.updateTask(changedTask)) {
+                    this.setState({
+                        tasksList: updatedTasks,
+                    });
                 }
-            });
-
-            this.setState({
-                tasksList: updatedTasks,
-            });
-        } else {
-            this._deleteTask(taskId);
+            } else {
+                this._deleteTask(taskId);
+            }
+        } catch ({ message }) {
+            console.log(message);
         }
+
+        this._changeSpinnerState(false);
     };
 
     render () {
